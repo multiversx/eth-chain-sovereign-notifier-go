@@ -23,7 +23,7 @@ const (
 	configPath = "config/config.toml"
 
 	logsPath       = "logs"
-	logFilePrefix  = "sovereign-notifier"
+	logFilePrefix  = "eth-notifier"
 	logLifeSpanSec = 432000 // 5 days
 	logLifeSpanMb  = 1024   // 1 GB
 )
@@ -76,7 +76,7 @@ func startNotifier(ctx *cli.Context) error {
 		}
 	}
 
-	wsClient, err := factory.CreateWSETHNotifier(cfg)
+	wsClient, err := factory.CreateWSETHClientNotifier(cfg)
 	if err != nil {
 		return fmt.Errorf("cannot create sovereign notifier, error: %w", err)
 	}
