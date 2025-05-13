@@ -3,7 +3,7 @@ package config
 // Config holds notifier configuration
 type Config struct {
 	SubscribedEvents []SubscribedEvent `toml:"subscribed_events"`
-	ClientConfig     ClientConfig      `toml:"web_socket"`
+	ClientConfig     ClientConfig      `toml:"client_config"`
 }
 
 // SubscribedEvent holds subscribed events config

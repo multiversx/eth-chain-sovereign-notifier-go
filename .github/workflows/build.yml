@@ -5,6 +5,7 @@ on:
     branches: [main, feat/*]
     types: [opened, ready_for_review]
   push:
+    branches: [main, feat/*]
   workflow_dispatch:
 
 jobs:

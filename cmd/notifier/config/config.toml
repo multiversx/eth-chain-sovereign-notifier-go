@@ -1,0 +1,6 @@
+subscribed_events = [
+    { identifier = "deposit", addresses = ["erd1", "erd1"] }
+]
+
+[client_config]
+    url = "https://eth.llamarpc.com"
