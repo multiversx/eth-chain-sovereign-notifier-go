@@ -8,8 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-
-	"github.com/multiversx/eth-chain-sovereign-notifier-go/config"
+	"github.com/multiversx/mx-chain-core-go/core/sovereign"
+	"github.com/multiversx/mx-chain-core-go/hashing"
+	"github.com/multiversx/mx-chain-core-go/marshal"
 )
 
 type blockTracker struct {
@@ -22,30 +23,40 @@ type blockTracker struct {
 
 	finalizedBlockNonce uint64
 
-	incomingHeaderCreator IncomingHeaderCreator
+	incomingHeadersNotifier IncomingHeadersNotifierHandler
+	incomingHeaderCreator   IncomingHeaderCreator
 }
 
 // todo: here, pass directly expected eth data, not our config
 
-func NewBlockTracker(subscribedEvents []config.SubscribedEvent, client ETHClientHandler) *blockTracker {
+type ArgsETHBlockTracker struct {
+	Marshaller marshal.Marshalizer
+	Hasher     hashing.Hasher
+}
+
+func NewBlockTracker(args ArgsETHBlockTracker) (*blockTracker, error) {
+
+	hn, err := sovereign.NewHeadersNotifier(args.Marshaller, args.Hasher)
+	if err != nil {
+		return nil, err
+	}
 
 	return &blockTracker{
-		blocks:           map[common.Hash]*types.Header{},
-		minConfirmations: 2,
-	}
+		blocks:                  map[common.Hash]*types.Header{},
+		minConfirmations:        2,
+		incomingHeadersNotifier: hn,
+	}, nil
 }
 
 func (bt *blockTracker) Start(ctx context.Context, errChan chan error) {
-	// also somewhere get latest block on a separate go routine to check block finality perhaps
-
-	latestHeader, err := bt.client.HeaderByNumber(context.Background(), nil)
+	latestHeader, err := bt.client.HeaderByNumber(ctx, nil)
 	if err != nil {
 		return
 	}
 
 	bt.finalizedBlockNonce = latestHeader.Nonce.Uint64() - uint64(bt.minConfirmations)
 
-	go bt.subscribeToNewHeaders(ctx, errChan)
+	bt.subscribeToNewHeaders(ctx, errChan)
 }
 
 func (bt *blockTracker) subscribeToNewHeaders(ctx context.Context, errChan chan error) {
@@ -62,33 +73,43 @@ func (bt *blockTracker) subscribeToNewHeaders(ctx context.Context, errChan chan 
 		case err := <-sub.Err():
 			errChan <- fmt.Errorf("header subscription error: %v", err)
 			return
-		case header := <-headers:
-			bt.processBlock(ctx, header, errChan)
+		case <-headers:
+			errChan <- bt.processBlock(ctx)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (bt *blockTracker) processBlock(ctx context.Context, header *types.Header, errChan chan error) {
+func (bt *blockTracker) processBlock(ctx context.Context) error {
 	query := ethereum.FilterQuery{
-		FromBlock: header.Number,
-		ToBlock:   header.Number,
+		FromBlock: big.NewInt(int64(bt.finalizedBlockNonce)),
+		ToBlock:   big.NewInt(int64(bt.finalizedBlockNonce)),
 		Addresses: bt.addresses,
 		Topics:    bt.topics,
 	}
 
 	logs, err := bt.client.FilterLogs(ctx, query)
 	if err != nil {
-		errChan <- fmt.Errorf("failed to subscribe to events: %v", err)
-		return
+		return fmt.Errorf("failed to filter logs: %v", err)
+
 	}
 
 	finalizedHeader, err := bt.client.HeaderByNumber(ctx, big.NewInt(int64(bt.finalizedBlockNonce)))
 	if err != nil {
-		errChan <- fmt.Errorf("failed to subscribe to events: %v", err)
-		return
+		return fmt.Errorf("failed to get header by number: %v", err)
 	}
 
-	bt.incomingHeaderCreator.CreateIncomingHeader(finalizedHeader, logs)
+	incomingHeader, err := bt.incomingHeaderCreator.CreateIncomingHeader(finalizedHeader, logs)
+	if err != nil {
+		return err
+	}
+
+	err = bt.incomingHeadersNotifier.NotifyHeaderSubscribers(incomingHeader)
+	if err != nil {
+		return err
+	}
+
+	bt.finalizedBlockNonce++
+	return nil
 }

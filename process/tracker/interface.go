@@ -6,7 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/multiversx/mx-chain-core-sovereign-go/data/sovereign"
+	sovCore "github.com/multiversx/mx-chain-core-go/core/sovereign"
+	"github.com/multiversx/mx-chain-core-go/data/sovereign"
 )
 
 type ETHClientHandler interface {
@@ -19,4 +20,9 @@ type ETHClientHandler interface {
 
 type IncomingHeaderCreator interface {
 	CreateIncomingHeader(header *types.Header, logs []types.Log) (sovereign.IncomingHeaderHandler, error)
+}
+
+type IncomingHeadersNotifierHandler interface {
+	NotifyHeaderSubscribers(header sovereign.IncomingHeaderHandler) error
+	RegisterSubscriber(handler sovCore.IncomingHeaderSubscriber) error
 }
