@@ -8,18 +8,18 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/multiversx/mx-chain-core-go/core/sovereign"
-	"github.com/multiversx/mx-chain-core-go/hashing"
-	"github.com/multiversx/mx-chain-core-go/marshal"
 )
+
+type SubscribedETHEvent struct {
+	Address common.Address
+	Topic   common.Hash
+}
 
 type blockTracker struct {
 	client           ETHClientHandler
-	blocks           map[common.Hash]*types.Header // todo: here cacher component + cacher for blocks
 	minConfirmations uint8
 
-	addresses []common.Address
-	topics    [][]common.Hash
+	subscribedETHEvents []SubscribedETHEvent
 
 	finalizedBlockNonce uint64
 
@@ -30,21 +30,21 @@ type blockTracker struct {
 // todo: here, pass directly expected eth data, not our config
 
 type ArgsETHBlockTracker struct {
-	Marshaller marshal.Marshalizer
-	Hasher     hashing.Hasher
+	SubscribedETHEvents []SubscribedETHEvent
+
+	MinConfirmations        uint8
+	Client                  ETHClientHandler
+	IncomingHeaderCreator   IncomingHeaderCreator
+	IncomingHeadersNotifier IncomingHeadersNotifierHandler
 }
 
 func NewBlockTracker(args ArgsETHBlockTracker) (*blockTracker, error) {
-
-	hn, err := sovereign.NewHeadersNotifier(args.Marshaller, args.Hasher)
-	if err != nil {
-		return nil, err
-	}
-
 	return &blockTracker{
-		blocks:                  map[common.Hash]*types.Header{},
-		minConfirmations:        2,
-		incomingHeadersNotifier: hn,
+		client:                  args.Client,
+		minConfirmations:        args.MinConfirmations,
+		subscribedETHEvents:     args.SubscribedETHEvents,
+		incomingHeadersNotifier: args.IncomingHeadersNotifier,
+		incomingHeaderCreator:   args.IncomingHeaderCreator,
 	}, nil
 }
 
@@ -82,17 +82,23 @@ func (bt *blockTracker) subscribeToNewHeaders(ctx context.Context, errChan chan 
 }
 
 func (bt *blockTracker) processBlock(ctx context.Context) error {
-	query := ethereum.FilterQuery{
-		FromBlock: big.NewInt(int64(bt.finalizedBlockNonce)),
-		ToBlock:   big.NewInt(int64(bt.finalizedBlockNonce)),
-		Addresses: bt.addresses,
-		Topics:    bt.topics,
-	}
+	logs := make([]types.Log, 0)
 
-	logs, err := bt.client.FilterLogs(ctx, query)
-	if err != nil {
-		return fmt.Errorf("failed to filter logs: %v", err)
+	for _, subEvent := range bt.subscribedETHEvents {
+		query := ethereum.FilterQuery{
+			FromBlock: big.NewInt(int64(bt.finalizedBlockNonce)),
+			ToBlock:   big.NewInt(int64(bt.finalizedBlockNonce)),
+			Addresses: []common.Address{subEvent.Address},
+			Topics:    [][]common.Hash{{subEvent.Topic}}, // matches topic in first position
+		}
 
+		currLogs, err := bt.client.FilterLogs(ctx, query)
+		if err != nil {
+			return fmt.Errorf("failed to filter logs: %v", err)
+
+		}
+
+		logs = append(logs, currLogs...)
 	}
 
 	finalizedHeader, err := bt.client.HeaderByNumber(ctx, big.NewInt(int64(bt.finalizedBlockNonce)))
@@ -112,4 +118,8 @@ func (bt *blockTracker) processBlock(ctx context.Context) error {
 
 	bt.finalizedBlockNonce++
 	return nil
+}
+
+func (bt *blockTracker) Close() {
+	//todo: here, close on chan start
 }

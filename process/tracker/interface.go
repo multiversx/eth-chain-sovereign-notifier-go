@@ -13,7 +13,6 @@ import (
 type ETHClientHandler interface {
 	SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error)
 	FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error)
-	SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error)
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
 	Close()
 }

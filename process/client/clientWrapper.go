@@ -1,6 +1,11 @@
 package client
 
 import (
+	"context"
+	"math/big"
+
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -19,6 +24,18 @@ func NewClient(url string) (*clientWrapper, error) {
 	return &clientWrapper{
 		client: client,
 	}, nil
+}
+
+func (cw *clientWrapper) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error) {
+	return cw.client.SubscribeNewHead(ctx, ch)
+}
+
+func (cw *clientWrapper) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error) {
+	return cw.client.FilterLogs(ctx, q)
+}
+
+func (cw *clientWrapper) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
+	return cw.client.HeaderByNumber(ctx, number)
 }
 
 // Close closes the underlying eth client connection
