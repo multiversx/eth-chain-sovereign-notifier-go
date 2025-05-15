@@ -1,6 +1,19 @@
 subscribed_events = [
-    { identifier = "deposit", addresses = ["0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", "0xB8c77482e45F1F44dE1745F52C74426C631bDD52"] }
+    # Identifier = Event's topic signature, e.g.:  event Deposit(address indexed user, uint256 amount);
+    # Address = SC's address
+
+    { identifier = "Deposit(address,uint256)", address = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" }
 ]
+
+# Possible values: sha256, keccak, blake2b. Should be compatible with sovereign nodes
+hasher_type = "blake2b"
+
+# Possible values: json, gogo protobuf. Should be compatible with sovereign nodes
+marshaller_type = "gogo protobuf"
+
+# Defines the min number confirmations for a block to be considered final.
+# Under normal conditions, an ETH block time <12s and a chain reorganization should not happen after > 6.5 mins
+min_blocks_confirmation = 2
 
 [client_config]
     url = "wss://rpc.sepolia.org"

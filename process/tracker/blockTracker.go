@@ -8,7 +8,10 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	logger "github.com/multiversx/mx-chain-logger-go"
 )
+
+var log = logger.GetOrCreate("eth-block-tracker")
 
 type SubscribedETHEvent struct {
 	Address common.Address
@@ -48,34 +51,30 @@ func NewBlockTracker(args ArgsETHBlockTracker) (*blockTracker, error) {
 	}, nil
 }
 
-func (bt *blockTracker) Start(ctx context.Context, errChan chan error) {
-	latestHeader, err := bt.client.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return
-	}
-
-	bt.finalizedBlockNonce = latestHeader.Nonce.Uint64() - uint64(bt.minConfirmations)
-
-	bt.subscribeToNewHeaders(ctx, errChan)
+func (bt *blockTracker) Start(ctx context.Context) {
+	bt.subscribeToNewHeaders(ctx)
 }
 
-func (bt *blockTracker) subscribeToNewHeaders(ctx context.Context, errChan chan error) {
+func (bt *blockTracker) subscribeToNewHeaders(ctx context.Context) {
 	headers := make(chan *types.Header)
 	sub, err := bt.client.SubscribeNewHead(ctx, headers)
 	if err != nil {
-		errChan <- fmt.Errorf("failed to subscribe to new headers: %v", err)
+		log.LogIfError(fmt.Errorf("failed to subscribe to new headers: %v", err))
 		return
 	}
 	defer sub.Unsubscribe()
 
 	for {
 		select {
-		case err := <-sub.Err():
-			errChan <- fmt.Errorf("header subscription error: %v", err)
+		case err = <-sub.Err():
+			log.Error("DASDADAAA", "err", err)
 			return
-		case <-headers:
-			errChan <- bt.processBlock(ctx)
+		case header := <-headers:
+			bt.finalizedBlockNonce = header.Number.Uint64() - uint64(bt.minConfirmations)
+			err = bt.processBlock(ctx)
+			log.LogIfError(err)
 		case <-ctx.Done():
+			sub.Unsubscribe()
 			return
 		}
 	}
@@ -101,6 +100,8 @@ func (bt *blockTracker) processBlock(ctx context.Context) error {
 		logs = append(logs, currLogs...)
 	}
 
+	log.Info("DSADAS", "num", bt.finalizedBlockNonce)
+
 	finalizedHeader, err := bt.client.HeaderByNumber(ctx, big.NewInt(int64(bt.finalizedBlockNonce)))
 	if err != nil {
 		return fmt.Errorf("failed to get header by number: %v", err)
@@ -116,7 +117,6 @@ func (bt *blockTracker) processBlock(ctx context.Context) error {
 		return err
 	}
 
-	bt.finalizedBlockNonce++
 	return nil
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -80,6 +81,10 @@ func startNotifier(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("cannot create sovereign notifier, error: %w", err)
 	}
+
+	go func() {
+		wsClient.Start(context.Background())
+	}()
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
