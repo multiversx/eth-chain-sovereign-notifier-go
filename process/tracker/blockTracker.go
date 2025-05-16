@@ -24,8 +24,6 @@ type blockTracker struct {
 
 	subscribedETHEvents []SubscribedETHEvent
 
-	finalizedBlockNonce uint64
-
 	incomingHeadersNotifier IncomingHeadersNotifierHandler
 	incomingHeaderCreator   IncomingHeaderCreator
 }
@@ -62,31 +60,37 @@ func (bt *blockTracker) subscribeToNewHeaders(ctx context.Context) {
 		log.LogIfError(fmt.Errorf("failed to subscribe to new headers: %v", err))
 		return
 	}
-	defer sub.Unsubscribe()
+
+	defer func() {
+		sub.Unsubscribe()
+		bt.client.Close()
+	}()
 
 	for {
 		select {
 		case err = <-sub.Err():
-			log.Error("DASDADAAA", "err", err)
+			log.Error("blockTracker.subscribeToNewHeaders", "err", err)
 			return
 		case header := <-headers:
-			bt.finalizedBlockNonce = header.Number.Uint64() - uint64(bt.minConfirmations)
-			err = bt.processBlock(ctx)
+			err = bt.processBlock(ctx, header)
 			log.LogIfError(err)
 		case <-ctx.Done():
-			sub.Unsubscribe()
 			return
 		}
 	}
 }
 
-func (bt *blockTracker) processBlock(ctx context.Context) error {
-	logs := make([]types.Log, 0)
+func (bt *blockTracker) processBlock(ctx context.Context, header *types.Header) error {
+	finalizedBlockNonce := header.Number.Uint64() - uint64(bt.minConfirmations)
+	finalizedBlockNonceBI := big.NewInt(int64(finalizedBlockNonce))
 
+	log.Info("received new eth block in tracker, will process latest finalized block", "nonce", finalizedBlockNonce)
+
+	logs := make([]types.Log, 0)
 	for _, subEvent := range bt.subscribedETHEvents {
 		query := ethereum.FilterQuery{
-			FromBlock: big.NewInt(int64(bt.finalizedBlockNonce)),
-			ToBlock:   big.NewInt(int64(bt.finalizedBlockNonce)),
+			FromBlock: finalizedBlockNonceBI,
+			ToBlock:   finalizedBlockNonceBI,
 			Addresses: []common.Address{subEvent.Address},
 			Topics:    [][]common.Hash{{subEvent.Topic}}, // matches topic in first position
 		}
@@ -100,11 +104,9 @@ func (bt *blockTracker) processBlock(ctx context.Context) error {
 		logs = append(logs, currLogs...)
 	}
 
-	log.Info("DSADAS", "num", bt.finalizedBlockNonce)
-
-	finalizedHeader, err := bt.client.HeaderByNumber(ctx, big.NewInt(int64(bt.finalizedBlockNonce)))
+	finalizedHeader, err := bt.client.HeaderByNumber(ctx, finalizedBlockNonceBI)
 	if err != nil {
-		return fmt.Errorf("failed to get header by number: %v", err)
+		return err
 	}
 
 	incomingHeader, err := bt.incomingHeaderCreator.CreateIncomingHeader(finalizedHeader, logs)
@@ -112,14 +114,9 @@ func (bt *blockTracker) processBlock(ctx context.Context) error {
 		return err
 	}
 
-	err = bt.incomingHeadersNotifier.NotifyHeaderSubscribers(incomingHeader)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return bt.incomingHeadersNotifier.NotifyHeaderSubscribers(incomingHeader)
 }
 
 func (bt *blockTracker) Close() {
-	//todo: here, close on chan start
+	bt.client.Close()
 }
