@@ -9,16 +9,12 @@ import (
 )
 
 type blockCache struct {
-	mut     sync.Mutex
-	headers map[uint64]*types.Header
-
-	maxSize      uint64
-	highestNonce uint64
-	oldestNonce  uint64
-
+	mut              sync.Mutex
+	headers          map[uint64]*types.Header
+	nonceOrder       []uint64 // Pentru pruning eficient
+	maxSize          uint64
 	minConfirmations uint64
-
-	client ETHClientHandler
+	client           ETHClientHandler
 }
 
 type ArgsBlockCache struct {
@@ -28,14 +24,15 @@ type ArgsBlockCache struct {
 }
 
 func NewBlockCache(args ArgsBlockCache) (*blockCache, error) {
+	if args.Client == nil || args.MaxSize == 0 {
+		return nil, fmt.Errorf("invalid args: client=%v, maxSize=%d", args.Client, args.MaxSize)
+	}
 	return &blockCache{
-		mut:              sync.Mutex{},
 		headers:          make(map[uint64]*types.Header),
-		maxSize:          0,
-		highestNonce:     0,
-		oldestNonce:      0,
-		minConfirmations: 0,
-		client:           nil,
+		nonceOrder:       make([]uint64, 0, args.MaxSize),
+		maxSize:          args.MaxSize,
+		client:           args.Client,
+		minConfirmations: args.MinConfirmations,
 	}, nil
 }
 
@@ -47,42 +44,34 @@ func (bc *blockCache) Add(ctx context.Context, header *types.Header) error {
 	hash := header.Hash()
 
 	if existingHdr, contains := bc.headers[hdrNonce]; contains && existingHdr.Hash() != hash {
-		log.Debug("eth chain reorg detected",
-			"nonce", hdrNonce,
-			"old hash", existingHdr.Hash().Hex(),
-			"new hash", hash.Hex(),
-		)
-
+		log.Debug("eth chain reorg detected", "nonce", hdrNonce, "old hash", existingHdr.Hash().Hex(), "new hash", hash.Hex())
 		canonicalHdr, err := bc.client.HeaderByNumber(ctx, header.Number)
 		if err != nil {
 			return fmt.Errorf("blockCache.Add.client.HeaderByNumber error: %w, nonce: %d", err, hdrNonce)
 		}
-
 		if canonicalHdr.Hash() != hash {
 			log.Debug("new header is not in canonical chain, discard it", "nonce", hdrNonce, "hash", hash.Hex())
 			return nil
 		}
 	}
 
-	bc.updateInternalData(hdrNonce)
+	bc.headers[hdrNonce] = header
+	bc.nonceOrder = append(bc.nonceOrder, hdrNonce)
+
+	log.Debug("Added header", "nonce", hdrNonce, "hash", hash.Hex())
+
+	bc.resizeCacheIfNeeded()
 	return nil
 }
 
-func (bc *blockCache) updateInternalData(hdrNonce uint64) {
-	if hdrNonce > bc.highestNonce {
-		bc.highestNonce = hdrNonce
-	}
-	if hdrNonce < bc.oldestNonce {
-		bc.oldestNonce = hdrNonce
-	}
-
-	bc.resizeCacheIfNeeded()
-}
-
 func (bc *blockCache) resizeCacheIfNeeded() {
-	if len(bc.headers) > int(bc.maxSize) {
-		delete(bc.headers, bc.oldestNonce)
-		bc.oldestNonce++
+	if len(bc.nonceOrder) > int(bc.maxSize) {
+		for i := 0; i < len(bc.nonceOrder) && len(bc.nonceOrder) > int(bc.maxSize); i++ {
+			log.Debug("Pruning block", "nonce", bc.nonceOrder[i])
+			delete(bc.headers, bc.nonceOrder[i])
+		}
+
+		bc.nonceOrder = bc.nonceOrder[len(bc.nonceOrder)-int(bc.maxSize):]
 	}
 }
 
@@ -91,14 +80,23 @@ func (bc *blockCache) ExtractFinalizedBlocks() []*types.Header {
 	defer bc.mut.Unlock()
 
 	finalizedHeaders := make([]*types.Header, 0)
-	for nonce := bc.oldestNonce; nonce < bc.highestNonce-bc.minConfirmations; nonce++ {
-		if header, found := bc.headers[nonce]; found {
-			finalizedHeaders = append(finalizedHeaders, header)
-			delete(bc.headers, nonce)
-		}
-
-		bc.oldestNonce++
+	if len(bc.nonceOrder) == 0 {
+		return finalizedHeaders
 	}
 
+	latestNonce := bc.nonceOrder[len(bc.nonceOrder)-1]
+	for i, nonce := range bc.nonceOrder {
+		if nonce <= latestNonce-bc.minConfirmations {
+			if header, found := bc.headers[nonce]; found {
+				finalizedHeaders = append(finalizedHeaders, header)
+				delete(bc.headers, nonce)
+			}
+		} else {
+			bc.nonceOrder = bc.nonceOrder[i:]
+			break
+		}
+	}
+
+	log.Debug("Extracted finalized blocks", "count", len(finalizedHeaders))
 	return finalizedHeaders
 }
