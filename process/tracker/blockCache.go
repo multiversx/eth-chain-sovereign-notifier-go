@@ -27,6 +27,11 @@ func NewBlockCache(args ArgsBlockCache) (*blockCache, error) {
 	if args.Client == nil || args.MaxSize == 0 {
 		return nil, fmt.Errorf("invalid args: client=%v, maxSize=%d", args.Client, args.MaxSize)
 	}
+
+	if args.MinConfirmations > args.MaxSize {
+		return nil, fmt.Errorf("invalid")
+	}
+
 	return &blockCache{
 		headers:          make(map[uint64]*types.Header),
 		nonceOrder:       make([]uint64, 0, args.MaxSize),
@@ -50,6 +55,7 @@ func (bc *blockCache) Add(ctx context.Context, header *types.Header) error {
 		if err != nil {
 			return fmt.Errorf("blockCache.Add.client.HeaderByNumber error: %w, nonce: %d", err, hdrNonce)
 		}
+
 		if canonicalHdr.Hash() != hash {
 			log.Debug("new header is not in canonical chain, discard it", "nonce", hdrNonce, "hash", hash.Hex())
 			return nil

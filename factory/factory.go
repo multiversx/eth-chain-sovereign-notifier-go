@@ -41,12 +41,23 @@ func CreateWSETHClientNotifier(cfg config.Config) (ETHClient, error) {
 		return nil, err
 	}
 
+	argsBlockCache := tracker.ArgsBlockCache{
+		MaxSize:          cfg.BlockCacheSize,
+		MinConfirmations: uint64(cfg.MinBlocksConfirmation),
+		Client:           ethClient,
+	}
+	blockCache, err := tracker.NewBlockCache(argsBlockCache)
+	if err != nil {
+		return nil, err
+	}
+
 	argsBlockTracker := tracker.ArgsETHBlockTracker{
 		SubscribedETHEvents:     subscribedEvents,
 		MinConfirmations:        cfg.MinBlocksConfirmation,
 		Client:                  ethClient,
 		IncomingHeaderCreator:   tracker.NewIncomingHeadersCreator(),
 		IncomingHeadersNotifier: headersNotifier,
+		BlockCache:              blockCache,
 	}
 
 	return tracker.NewBlockTracker(argsBlockTracker)

@@ -25,3 +25,8 @@ type IncomingHeadersNotifierHandler interface {
 	NotifyHeaderSubscribers(header sovereign.IncomingHeaderHandler) error
 	RegisterSubscriber(handler sovCore.IncomingHeaderSubscriber) error
 }
+
+type BlockCache interface {
+	Add(ctx context.Context, header *types.Header) error
+	ExtractFinalizedBlocks() []*types.Header
+}

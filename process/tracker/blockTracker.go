@@ -3,7 +3,6 @@ package tracker
 import (
 	"context"
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,13 +18,13 @@ type SubscribedETHEvent struct {
 }
 
 type blockTracker struct {
-	client           ETHClientHandler
-	minConfirmations uint8
-
+	minConfirmations    uint8
 	subscribedETHEvents []SubscribedETHEvent
 
+	client                  ETHClientHandler
 	incomingHeadersNotifier IncomingHeadersNotifierHandler
 	incomingHeaderCreator   IncomingHeaderCreator
+	blockCache              BlockCache
 }
 
 // todo: here, pass directly expected eth data, not our config
@@ -37,6 +36,7 @@ type ArgsETHBlockTracker struct {
 	Client                  ETHClientHandler
 	IncomingHeaderCreator   IncomingHeaderCreator
 	IncomingHeadersNotifier IncomingHeadersNotifierHandler
+	BlockCache              BlockCache
 }
 
 func NewBlockTracker(args ArgsETHBlockTracker) (*blockTracker, error) {
@@ -46,6 +46,7 @@ func NewBlockTracker(args ArgsETHBlockTracker) (*blockTracker, error) {
 		subscribedETHEvents:     args.SubscribedETHEvents,
 		incomingHeadersNotifier: args.IncomingHeadersNotifier,
 		incomingHeaderCreator:   args.IncomingHeaderCreator,
+		blockCache:              args.BlockCache,
 	}, nil
 }
 
@@ -81,42 +82,61 @@ func (bt *blockTracker) subscribeToNewHeaders(ctx context.Context) {
 }
 
 func (bt *blockTracker) processBlock(ctx context.Context, header *types.Header) error {
-	finalizedBlockNonce := header.Number.Uint64() - uint64(bt.minConfirmations)
-	finalizedBlockNonceBI := big.NewInt(int64(finalizedBlockNonce))
+	log.Info("received new eth block in tracker, will process latest finalized block", "nonce", header.Number.Uint64())
 
-	log.Info("received new eth block in tracker, will process latest finalized block", "nonce", finalizedBlockNonce)
+	errCache := bt.blockCache.Add(ctx, header)
+	if errCache != nil {
+		return errCache
+	}
 
+	finalizedHeaders := bt.blockCache.ExtractFinalizedBlocks()
+	if len(finalizedHeaders) == 0 {
+		return nil
+	}
+
+	for _, finalizedHeader := range finalizedHeaders {
+		logs, err := bt.getLogs(ctx, finalizedHeader)
+		if err != nil {
+			return err
+		}
+
+		incomingHeader, err := bt.incomingHeaderCreator.CreateIncomingHeader(finalizedHeader, logs)
+		if err != nil {
+			return err
+		}
+
+		err = bt.incomingHeadersNotifier.NotifyHeaderSubscribers(incomingHeader)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (bt *blockTracker) getLogs(ctx context.Context, header *types.Header) ([]types.Log, error) {
 	logs := make([]types.Log, 0)
 	for _, subEvent := range bt.subscribedETHEvents {
 		query := ethereum.FilterQuery{
-			FromBlock: finalizedBlockNonceBI,
-			ToBlock:   finalizedBlockNonceBI,
+			FromBlock: header.Number,
+			ToBlock:   header.Number,
 			Addresses: []common.Address{subEvent.Address},
 			Topics:    [][]common.Hash{{subEvent.Topic}}, // matches topic in first position
 		}
 
 		currLogs, err := bt.client.FilterLogs(ctx, query)
 		if err != nil {
-			return fmt.Errorf("failed to filter logs: %v", err)
+			return nil, fmt.Errorf("failed to filter logs: %v", err)
 
 		}
 
 		logs = append(logs, currLogs...)
 	}
 
-	finalizedHeader, err := bt.client.HeaderByNumber(ctx, finalizedBlockNonceBI)
-	if err != nil {
-		return err
-	}
-
-	incomingHeader, err := bt.incomingHeaderCreator.CreateIncomingHeader(finalizedHeader, logs)
-	if err != nil {
-		return err
-	}
-
-	return bt.incomingHeadersNotifier.NotifyHeaderSubscribers(incomingHeader)
+	return logs, nil
 }
 
 func (bt *blockTracker) Close() {
+	// todo: here chan closer and add in Start for {} loop
 	bt.client.Close()
 }

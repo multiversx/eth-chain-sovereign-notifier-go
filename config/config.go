@@ -6,6 +6,7 @@ type Config struct {
 	HasherType     string `toml:"hasher_type"`
 
 	MinBlocksConfirmation uint8             `toml:"min_blocks_confirmation"`
+	BlockCacheSize        uint64            `toml:"block_cache_size"`
 	SubscribedEvents      []SubscribedEvent `toml:"subscribed_events"`
 	ClientConfig          ClientConfig      `toml:"client_config"`
 }

@@ -12,8 +12,12 @@ hasher_type = "blake2b"
 marshaller_type = "gogo protobuf"
 
 # Defines the min number confirmations for a block to be considered final.
-# Under normal conditions, an ETH block time <12s and a chain reorganization should not happen after > 6.5 mins
+# Under normal conditions, an ETH block time ~= 12s and a chain reorganization should not happen after > 6.5 mins
 min_blocks_confirmation = 2
+
+# Defines block cache size. If we have an average of a block/12s, then in 10 minutes, cache size should be ~= 50.
+# For a cache size = 1000, we would hold blocks from the past 6h 40min.
+block_cache_size = 1000
 
 [client_config]
     url = "wss://rpc.sepolia.org"
