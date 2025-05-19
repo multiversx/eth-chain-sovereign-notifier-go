@@ -16,7 +16,7 @@ marshaller_type = "gogo protobuf"
 min_blocks_confirmation = 2
 
 # Defines block cache size. If we have an average of a block/12s, then in 10 minutes, cache size should be ~= 50.
-# For a cache size = 1000, we would hold blocks from the past 6h 40min.
+# For a cache size = 1000, we would hold blocks from the past ~3h.
 block_cache_size = 1000
 
 [client_config]

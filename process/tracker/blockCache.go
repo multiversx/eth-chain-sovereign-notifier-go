@@ -6,7 +6,11 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/multiversx/mx-chain-core-go/core/check"
 )
+
+const minCacheSize = 1
+const maxCacheSize = 10000
 
 type blockCache struct {
 	mut              sync.Mutex
@@ -17,19 +21,27 @@ type blockCache struct {
 	client           ETHClientHandler
 }
 
+// ArgsBlockCache is a struct placeholder containing needed args for a block tracker cache
 type ArgsBlockCache struct {
 	MaxSize          uint64
 	MinConfirmations uint64
 	Client           ETHClientHandler
 }
 
+// NewBlockCache creates a new eth block tracker cacher
 func NewBlockCache(args ArgsBlockCache) (*blockCache, error) {
-	if args.Client == nil || args.MaxSize == 0 {
-		return nil, fmt.Errorf("invalid args: client=%v, maxSize=%d", args.Client, args.MaxSize)
+	if check.IfNil(args.Client) {
+		return nil, errNilClient
+	}
+
+	if args.MaxSize < minCacheSize || args.MaxSize > maxCacheSize {
+		return nil, fmt.Errorf("%w: %d, min value: %d, max value: %d",
+			errInvalidMaxCacheSize, args.MaxSize, minCacheSize, maxCacheSize)
 	}
 
 	if args.MinConfirmations > args.MaxSize {
-		return nil, fmt.Errorf("invalid")
+		return nil, fmt.Errorf("%w : %d, should be less than max cache size: %d",
+			errInvalidMinConfirmations, args.MinConfirmations, args.MaxSize)
 	}
 
 	return &blockCache{
@@ -41,6 +53,9 @@ func NewBlockCache(args ArgsBlockCache) (*blockCache, error) {
 	}, nil
 }
 
+// Add inserts a block header into the cache, handling chain reorgs. It checks for reorgs by comparing hashes, verifies
+// canonicity with HeaderByNumber, and discards non-canonical headers. For new blocks, it appends the nonce to nonceOrder.
+// Updates the cache, logs the action, and resizes if needed.
 func (bc *blockCache) Add(ctx context.Context, header *types.Header) error {
 	bc.mut.Lock()
 	defer bc.mut.Unlock()
@@ -77,13 +92,15 @@ func (bc *blockCache) resizeCacheIfNeeded() {
 	numToRemove := len(bc.nonceOrder) - int(bc.maxSize)
 	if numToRemove > 0 {
 		for i := 0; i < numToRemove; i++ {
-			log.Debug("Pruning block", "nonce", bc.nonceOrder[i])
+			log.Debug("blockCache.resizeCacheIfNeeded pruning block", "nonce", bc.nonceOrder[i])
 			delete(bc.headers, bc.nonceOrder[i])
 		}
 		bc.nonceOrder = bc.nonceOrder[numToRemove:]
 	}
 }
 
+// ExtractFinalizedBlocks returns headers with sufficient confirmations (nonce <= latestNonce - minConfirmations) and
+// removes them from the cache. If minConfirmations==0, clears nonceOrder entirely.
 func (bc *blockCache) ExtractFinalizedBlocks() []*types.Header {
 	bc.mut.Lock()
 	defer bc.mut.Unlock()
@@ -108,6 +125,10 @@ func (bc *blockCache) ExtractFinalizedBlocks() []*types.Header {
 	}
 
 	bc.nonceOrder = bc.nonceOrder[:0]
-	log.Debug("extracted finalized blocks", "num", len(finalizedHeaders))
 	return finalizedHeaders
+}
+
+// IsInterfaceNil checks if the underlying pointer is nil
+func (bc *blockCache) IsInterfaceNil() bool {
+	return bc == nil
 }

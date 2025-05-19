@@ -6,6 +6,6 @@ import (
 
 // ETHClient defines what a websocket client should do
 type ETHClient interface {
-	Start(ctx context.Context)
+	Start(ctx context.Context) error
 	Close()
 }

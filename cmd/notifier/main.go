@@ -83,7 +83,12 @@ func startNotifier(ctx *cli.Context) error {
 	}
 
 	go func() {
-		wsClient.Start(context.Background())
+		for {
+			err = wsClient.Start(context.Background())
+			log.LogIfError(err)
+			time.Sleep(time.Second)
+		}
+
 	}()
 
 	interrupt := make(chan os.Signal, 1)

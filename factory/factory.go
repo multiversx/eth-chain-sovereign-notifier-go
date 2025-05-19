@@ -60,7 +60,7 @@ func CreateWSETHClientNotifier(cfg config.Config) (ETHClient, error) {
 		BlockCache:              blockCache,
 	}
 
-	return tracker.NewBlockTracker(argsBlockTracker)
+	return tracker.NewBlockTrackerNotifier(argsBlockTracker)
 }
 
 func createETHSubscribedEvents(subscribedEvents []config.SubscribedEvent) ([]tracker.SubscribedETHEvent, error) {

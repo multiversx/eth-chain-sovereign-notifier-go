@@ -26,14 +26,17 @@ func NewClient(url string) (*clientWrapper, error) {
 	}, nil
 }
 
+// SubscribeNewHead subscribes to notifications about the current blockchain head on the given channel.
 func (cw *clientWrapper) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error) {
 	return cw.client.SubscribeNewHead(ctx, ch)
 }
 
+// FilterLogs executes a filter query.
 func (cw *clientWrapper) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error) {
 	return cw.client.FilterLogs(ctx, q)
 }
 
+// HeaderByNumber returns a block header from the current canonical chain. If number is nil, the latest known header is returned.
 func (cw *clientWrapper) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
 	return cw.client.HeaderByNumber(ctx, number)
 }

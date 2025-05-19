@@ -8,8 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	logger "github.com/multiversx/mx-chain-logger-go"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/multiversx/eth-chain-sovereign-notifier-go/testscommon"
@@ -23,8 +21,6 @@ func createHash(id uint64) common.Hash {
 
 func TestBlockCache_ExtractFinalizedBlocksWithChainReorganization(t *testing.T) {
 	t.Parallel()
-
-	logger.SetLogLevel("*:DEBUG")
 
 	cache, _ := NewBlockCache(ArgsBlockCache{
 		MaxSize:          10,
@@ -95,8 +91,6 @@ func TestBlockCache_ExtractFinalizedBlocksWithChainReorganization(t *testing.T) 
 func TestBlockCache_ExtractFinalizedBlocksWithDiscardedChainReorg(t *testing.T) {
 	t.Parallel()
 
-	logger.SetLogLevel("*:DEBUG")
-
 	cache, _ := NewBlockCache(ArgsBlockCache{
 		MaxSize:          10,
 		MinConfirmations: 2,
@@ -150,8 +144,6 @@ func TestBlockCache_ExtractFinalizedBlocksWithDiscardedChainReorg(t *testing.T) 
 
 func TestBlockCache_CacheSizeFull(t *testing.T) {
 	t.Parallel()
-
-	logger.SetLogLevel("*:DEBUG")
 
 	cache, _ := NewBlockCache(ArgsBlockCache{
 		MaxSize:          5,

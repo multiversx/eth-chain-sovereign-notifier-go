@@ -11,10 +11,13 @@ import (
 type incomingHeaderCreator struct {
 }
 
+// NewIncomingHeadersCreator creates a new incoming header creator
 func NewIncomingHeadersCreator() *incomingHeaderCreator {
 	return &incomingHeaderCreator{}
 }
 
+// CreateIncomingHeader will create an incoming header for MVX chain, based on the provided ETH header with its incoming logs
+// For now, the proof represents the json bytes of the ETH header.
 func (ihc *incomingHeaderCreator) CreateIncomingHeader(header *types.Header, logs []types.Log) (sovereign.IncomingHeaderHandler, error) {
 	bytes, err := header.MarshalJSON()
 	if err != nil {
@@ -32,12 +35,12 @@ func (ihc *incomingHeaderCreator) CreateIncomingHeader(header *types.Header, log
 func createIncomingEvents(logs []types.Log) []*transaction.Event {
 	incomingEvents := make([]*transaction.Event, len(logs))
 
-	for idx, log := range logs {
+	for idx, ethLog := range logs {
 		incomingEvents[idx] = &transaction.Event{
-			Address:    log.Address.Bytes(),
+			Address:    ethLog.Address.Bytes(),
 			Identifier: nil, // todo
-			Topics:     getTopics(log.Topics),
-			Data:       log.Data,
+			Topics:     getTopics(ethLog.Topics),
+			Data:       ethLog.Data,
 		}
 	}
 
@@ -51,4 +54,9 @@ func getTopics(topics []common.Hash) [][]byte {
 	}
 
 	return res
+}
+
+// IsInterfaceNil checks if the underlying pointer is nil
+func (ihc *incomingHeaderCreator) IsInterfaceNil() bool {
+	return ihc == nil
 }
