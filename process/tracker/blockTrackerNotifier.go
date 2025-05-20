@@ -101,7 +101,7 @@ func (btn *blockTrackerNotifier) Start(ctx context.Context) error {
 }
 
 func (btn *blockTrackerNotifier) processBlock(ctx context.Context, header *types.Header) error {
-	log.Info("received new ETH block in tracker", "nonce", header.Number.Uint64(), "hash", header.Hash().Hex())
+	log.Debug("received new ETH block in tracker", "nonce", header.Number.Uint64(), "hash", header.Hash().Hex())
 
 	errCache := btn.blockCache.Add(ctx, header)
 	if errCache != nil {

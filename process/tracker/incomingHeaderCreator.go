@@ -27,7 +27,7 @@ func (ihc *incomingHeaderCreator) CreateIncomingHeader(header *types.Header, log
 	return &sovereign.IncomingHeader{
 		Proof:          bytes,
 		SourceChainID:  dto.ETH,
-		Nonce:          header.Nonce.Uint64(),
+		Nonce:          header.Number.Uint64(),
 		IncomingEvents: createIncomingEvents(logs),
 	}, nil
 }
