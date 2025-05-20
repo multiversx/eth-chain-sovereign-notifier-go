@@ -10,10 +10,19 @@ import (
 
 // ETHClientHandlerMock is a mock implementation of the ETHClientHandler interface
 type ETHClientHandlerMock struct {
+	DialCalled             func() error
 	SubscribeNewHeadCalled func(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error)
 	FilterLogsCalled       func(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error)
 	HeaderByNumberCalled   func(ctx context.Context, number *big.Int) (*types.Header, error)
 	CloseCalled            func()
+}
+
+// Dial mocks the Dial method
+func (mock *ETHClientHandlerMock) Dial() error {
+	if mock.DialCalled != nil {
+		return mock.DialCalled()
+	}
+	return nil
 }
 
 // SubscribeNewHead mocks the SubscribeNewHead method

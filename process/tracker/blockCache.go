@@ -57,11 +57,11 @@ func NewBlockCache(args ArgsBlockCache) (*blockCache, error) {
 // canonicity with HeaderByNumber, and discards non-canonical headers. For new blocks, it appends the nonce to nonceOrder.
 // Updates the cache, logs the action, and resizes if needed.
 func (bc *blockCache) Add(ctx context.Context, header *types.Header) error {
-	bc.mut.Lock()
-	defer bc.mut.Unlock()
-
 	hdrNonce := header.Number.Uint64()
 	hash := header.Hash()
+
+	bc.mut.Lock()
+	defer bc.mut.Unlock()
 
 	existingHdr, contains := bc.headers[hdrNonce]
 	if contains && existingHdr.Hash() != hash {
