@@ -12,6 +12,7 @@ import (
 
 // ETHClientHandler defines an eth client behavior
 type ETHClientHandler interface {
+	Dial() error
 	SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error)
 	FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error)
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)

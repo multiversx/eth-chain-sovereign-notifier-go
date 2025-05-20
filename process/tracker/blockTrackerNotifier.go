@@ -28,6 +28,8 @@ type blockTrackerNotifier struct {
 	blockCache              BlockCache
 	incomingHeadersNotifier IncomingHeadersNotifierHandler
 	incomingHeaderCreator   IncomingHeaderCreator
+
+	sub ethereum.Subscription
 }
 
 // ArgsETHBlockTracker is a struct placeholder for args needed to create a block tracker
@@ -58,22 +60,31 @@ func NewBlockTrackerNotifier(args ArgsETHBlockTracker) (*blockTrackerNotifier, e
 // block cache tracker and check for confirmed(finalized) blocks. If any finalized blocks are found
 // it will create its corresponding incoming header and notify subscribed components.
 func (btn *blockTrackerNotifier) Start(ctx context.Context) error {
+	btn.closer = closing.NewSafeChanCloser()
+	err := btn.client.Dial()
+	if err != nil {
+		return err
+	}
+
 	headers := make(chan *types.Header)
-	sub, err := btn.client.SubscribeNewHead(ctx, headers)
+	btn.sub, err = btn.client.SubscribeNewHead(ctx, headers)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
-		sub.Unsubscribe()
 		btn.Close()
 	}()
 
 	for {
 		select {
-		case err = <-sub.Err():
-			log.Error("blockTrackerNotifier.subscribeToNewHeaders", "err", err)
-			return err
+		case err = <-btn.sub.Err():
+			if err != nil {
+				log.Error("blockTrackerNotifier.subscribeToNewHeaders", "err", err)
+				return err
+			}
+			log.Debug("blockTrackerNotifier: subscription closed")
+			return nil
 		case header := <-headers:
 			err = btn.processBlock(ctx, header)
 			if err != nil {
@@ -85,7 +96,6 @@ func (btn *blockTrackerNotifier) Start(ctx context.Context) error {
 		case <-btn.closer.ChanClose():
 			log.Debug("blockTrackerNotifier.btn.closer.ChanClose()")
 			return nil
-
 		}
 	}
 }
@@ -148,5 +158,12 @@ func (btn *blockTrackerNotifier) getLogs(ctx context.Context, header *types.Head
 // Close will close the underlying client and closer chan
 func (btn *blockTrackerNotifier) Close() {
 	defer btn.closer.Close() // should always be last
-	btn.client.Close()
+
+	if btn.sub != nil {
+		btn.sub.Unsubscribe()
+		btn.sub = nil
+	}
+	if btn.client != nil {
+		btn.client.Close()
+	}
 }
