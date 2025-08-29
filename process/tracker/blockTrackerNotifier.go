@@ -162,7 +162,7 @@ func (btn *blockTrackerNotifier) RegisterHandler(handler sovereign.IncomingHeade
 }
 
 // Close will close the underlying client and closer chan
-func (btn *blockTrackerNotifier) Close() {
+func (btn *blockTrackerNotifier) Close() error {
 	defer btn.closer.Close() // should always be last
 
 	if btn.sub != nil {
@@ -172,6 +172,8 @@ func (btn *blockTrackerNotifier) Close() {
 	if btn.client != nil {
 		btn.client.Close()
 	}
+
+	return nil
 }
 
 // IsInterfaceNil checks if the underlying pointer is nil

@@ -10,6 +10,6 @@ import (
 type ETHClient interface {
 	Start(ctx context.Context) error
 	RegisterHandler(handler sovereign.IncomingHeaderSubscriber) error
-	Close()
+	Close() error
 	IsInterfaceNil() bool
 }

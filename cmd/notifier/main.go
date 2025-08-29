@@ -108,7 +108,8 @@ func startNotifier(ctx *cli.Context) error {
 	log.Info("closing app at user's signal")
 
 	cancelFunc()
-	wsClient.Close()
+	err = wsClient.Close()
+	log.LogIfError(err)
 
 	if withLogFile {
 		err = logFile.Close()
