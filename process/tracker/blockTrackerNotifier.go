@@ -173,3 +173,8 @@ func (btn *blockTrackerNotifier) Close() {
 		btn.client.Close()
 	}
 }
+
+// IsInterfaceNil checks if the underlying pointer is nil
+func (btn *blockTrackerNotifier) IsInterfaceNil() bool {
+	return btn == nil
+}
