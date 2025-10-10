@@ -14,6 +14,7 @@ import (
 
 var log = logger.GetOrCreate("eth-block-tracker")
 
+// SubscribedETHEvent holds subscribed ETH event data
 type SubscribedETHEvent struct {
 	Address common.Address
 	Topic   common.Hash
