@@ -2,14 +2,19 @@ package config
 
 // Config holds notifier configuration
 type Config struct {
-	SubscribedEvents []SubscribedEvent `toml:"subscribed_events"`
-	ClientConfig     ClientConfig      `toml:"client_config"`
+	MarshallerType string `toml:"marshaller_type"`
+	HasherType     string `toml:"hasher_type"`
+
+	MinBlocksConfirmation uint8             `toml:"min_blocks_confirmation"`
+	BlockCacheSize        uint64            `toml:"block_cache_size"`
+	SubscribedEvents      []SubscribedEvent `toml:"subscribed_events"`
+	ClientConfig          ClientConfig      `toml:"client_config"`
 }
 
 // SubscribedEvent holds subscribed events config
 type SubscribedEvent struct {
-	Identifier string   `toml:"identifier"`
-	Addresses  []string `toml:"addresses"`
+	Identifier string `toml:"identifier"`
+	Address    string `toml:"addresses"`
 }
 
 // ClientConfig holds client web sockets config
