@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/closing"
+	"github.com/multiversx/mx-chain-core-go/core/sovereign"
 	logger "github.com/multiversx/mx-chain-logger-go"
 )
 
@@ -156,8 +157,13 @@ func (btn *blockTrackerNotifier) getLogs(ctx context.Context, header *types.Head
 	return logs, nil
 }
 
+// RegisterHandler will register an incoming header subscriber
+func (btn *blockTrackerNotifier) RegisterHandler(handler sovereign.IncomingHeaderSubscriber) error {
+	return btn.incomingHeadersNotifier.RegisterSubscriber(handler)
+}
+
 // Close will close the underlying client and closer chan
-func (btn *blockTrackerNotifier) Close() {
+func (btn *blockTrackerNotifier) Close() error {
 	defer btn.closer.Close() // should always be last
 
 	if btn.sub != nil {
@@ -167,4 +173,11 @@ func (btn *blockTrackerNotifier) Close() {
 	if btn.client != nil {
 		btn.client.Close()
 	}
+
+	return nil
+}
+
+// IsInterfaceNil checks if the underlying pointer is nil
+func (btn *blockTrackerNotifier) IsInterfaceNil() bool {
+	return btn == nil
 }
